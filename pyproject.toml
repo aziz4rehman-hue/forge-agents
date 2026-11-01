@@ -1,0 +1,23 @@
+[project]
+name = "forge-agents"
+version = "0.1.0"
+description = "Local-first multi-agent runtime: planner, worker, and critic. Runs with zero API keys."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Aziz Rehman" }]
+keywords = ["ai", "agents", "llm", "tools"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/aziz4rehman-hue/forge-agents"
+
+[project.scripts]
+forge-agents = "forge_agents.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["forge_agents*"]
