@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>forge-agents demo</title>
+<style>
+  :root { color-scheme: dark; --bg:#0c0f14; --card:#151b24; --line:#2a3444; --text:#e7edf5; --muted:#93a0b5; --accent:#c084fc; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.45 ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header, main { width:min(720px, calc(100% - 32px)); margin:0 auto; }
+  header { padding:28px 0 8px; }
+  .kicker { color:var(--accent); letter-spacing:.14em; text-transform:uppercase; font-size:12px; margin:0 0 8px; }
+  h1 { font-size:28px; margin:0 0 8px; }
+  p { color:var(--muted); }
+  a { color:var(--accent); }
+  form { display:flex; gap:8px; margin-top:16px; }
+  input { flex:1; background:#10151d; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px; font:inherit; }
+  button { background:var(--accent); color:#1c0f2a; border:0; border-radius:12px; padding:12px 14px; font:inherit; font-weight:700; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:14px 0 28px; white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
+</style>
+</head>
+<body>
+<header>
+  <p class="kicker">Live demo</p>
+  <h1>forge-agents</h1>
+  <p>Planner, worker, critic. Arithmetic only, no API key. <a href="https://github.com/aziz4rehman-hue/forge-agents">Source</a></p>
+</header>
+<main>
+  <form id="ask">
+    <input id="q" value="What is (12 * 8) + 5? Remember that agents need tools." aria-label="Task">
+    <button type="submit">Run crew</button>
+  </form>
+  <div class="panel" id="out"></div>
+</main>
+<script>
+const notes=[];
+function evalExpr(source){
+  const text=source.replace(/\^/g,"**");
+  if(text.length>100) throw new Error("expression too long");
+  if(!/^[\d\s+\-*/%.()]+$/.test(text.replace(/\*\*/g,"**"))) throw new Error("unsupported expression");
+  if(/[a-z_]/i.test(text)) throw new Error("unsupported expression");
+  const tokens=text.match(/\d+(?:\.\d+)?|\*\*|[-+*/%()]/g);
+  if(!tokens) throw new Error("unsupported expression");
+  let i=0;
+  function peek(){return tokens[i]}
+  function eat(x){if(peek()!==x) throw new Error("unsupported expression"); return tokens[i++]}
+  function parseExpr(){return parseAdd()}
+  function parseAdd(){let v=parseMul(); while(peek()==="+"||peek()==="-"){const op=tokens[i++]; const r=parseMul(); v=op==="+"?v+r:v-r} return v}
+  function parseMul(){let v=parsePow(); while(peek()==="*"||peek()==="/"||peek()==="%"){const op=tokens[i++]; const r=parsePow(); if(op==="/"&&r===0) throw new Error("division by zero"); v=op==="*"?v*r:op==="/"?v/r:v%r} return v}
+  function parsePow(){let v=parseUnary(); if(peek()==="**"){tokens[i++]; const e=parseUnary(); if(Math.abs(e)>16) throw new Error("exponent too large"); v=v**e} return v}
+  function parseUnary(){if(peek()==="-"){tokens[i++]; return -parseUnary()} if(peek()==="+"){tokens[i++]; return parseUnary()} return parsePrimary()}
+  function parsePrimary(){if(peek()==="("){eat("("); const v=parseExpr(); eat(")"); return v} if(!/^\d/.test(peek()||"")) throw new Error("unsupported expression"); return Number(tokens[i++])}
+  const value=parseExpr();
+  if(i!==tokens.length) throw new Error("unsupported expression");
+  return Number.isInteger(value)?String(value):String(value);
+}
+function findExpr(text){
+  const src=text.replace(/\^/g,"**");
+  const matches=src.match(/(?:\d+(?:\.\d+)?|\([^()]+\))(?:\s*(?:\*\*|[-+*/%])\s*(?:\d+(?:\.\d+)?|\([^()]+\)))+/g)||[];
+  let best=null;
+  for(const m of matches){try{evalExpr(m); if(!best||m.length>best.length) best=m.trim()}catch(e){}}
+  return best;
+}
+function run(task){
+  const steps=[];
+  const expr=findExpr(task);
+  if(expr) steps.push("Calculate "+expr);
+  const remembered=task.match(/remember(?:\s+that)?\s+(.+)/i);
+  if(remembered) steps.push("remember "+remembered[1].trim());
+  if(!steps.length) steps.push("Answer the task directly in one short paragraph");
+  const traces=steps.map(step=>{
+    const found=findExpr(step);
+    if(found) return {step, result:"calculator -> "+evalExpr(found)};
+    const mem=step.match(/remember(?:\s+that)?\s+(.+)/i);
+    if(mem){notes.push(mem[1].trim()); return {step, result:"memory_write -> saved note "+notes.length}}
+    return {step, result:"No tool needed. Noted: "+step};
+  });
+  const answer="Final answer based on the crew trace:\n"+JSON.stringify({task, traces, notes:[...notes]}, null, 2);
+  return {plan:steps, traces, notes:[...notes], answer};
+}
+function show(task){
+  const out=document.getElementById("out");
+  try { out.textContent=JSON.stringify(run(task), null, 2); }
+  catch(err){ out.textContent="error: "+err.message; }
+}
+document.getElementById("ask").onsubmit=(e)=>{e.preventDefault(); show(document.getElementById("q").value);};
+show(document.getElementById("q").value);
+</script>
+</body>
+</html>

@@ -2,6 +2,8 @@
 
 Local-first multi-agent runtime in Python. A planner splits the task, a worker calls tools, and a critic writes the final answer. The default provider is a deterministic heuristic, so the whole crew runs with **no API key and no network**.
 
+**[See the live demo](https://aziz4rehman-hue.github.io/forge-agents/)**
+
 ```
 python -m forge_agents "What is (12 * 8) + 5?"
 python -m forge_agents --crew "What is 2**10? Remember that transformers use attention."
